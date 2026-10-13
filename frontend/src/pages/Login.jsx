@@ -1,7 +1,8 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { Sprout, Lock, Mail, User, Phone, MapPin, BadgePercent, Coins, Navigation } from 'lucide-react';
+import AboutModal from '../components/AboutModal';
+import { Sprout, Lock, Mail, User, Phone, MapPin, BadgePercent, Coins, Navigation, Info } from 'lucide-react';
 
 const Login = () => {
   const [isLoginTab, setIsLoginTab] = useState(true);
@@ -35,6 +36,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
@@ -103,6 +105,22 @@ const Login = () => {
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-teal-500/10 rounded-full blur-[120px] pointer-events-none" />
 
+      {/* Top Header with About AgriLend360 trigger */}
+      <div className="w-full max-w-4xl flex items-center justify-between mb-4 px-2 z-10">
+        <div className="flex items-center space-x-2 text-xs text-emerald-400 font-medium">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>FPO Decision-Support & Credit Management Platform</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsAboutOpen(true)}
+          className="flex items-center space-x-2 px-3.5 py-1.5 bg-slate-900/90 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/60 rounded-xl text-xs font-semibold shadow-lg transition backdrop-blur-sm"
+        >
+          <Info className="h-4 w-4 text-emerald-400" />
+          <span>About AgriLend360</span>
+        </button>
+      </div>
+
       {/* Main Container */}
       <div className="w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row relative z-10">
         
@@ -138,6 +156,17 @@ const Login = () => {
                 <BadgePercent className="h-4 w-4 text-emerald-400" />
                 <span>Dynamic Credit Health Scoring</span>
               </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setIsAboutOpen(true)}
+                className="w-full flex items-center justify-center space-x-2 py-2.5 px-3 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-700/60 rounded-xl text-xs font-bold transition shadow-sm"
+              >
+                <Info className="h-4 w-4 text-emerald-400" />
+                <span>About AgriLend360 (Concept & Flow)</span>
+              </button>
             </div>
           </div>
 
@@ -228,6 +257,16 @@ const Login = () => {
               <div className="text-center pt-2 text-xs text-slate-500">
                 Demo Accounts: admin@agrilend360.com / officer@agrilend360.com / farmer@agrilend360.com (Pass: admin123 / officer123 / farmer123)
               </div>
+
+              <div className="text-center pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsAboutOpen(true)}
+                  className="text-xs text-emerald-400 hover:text-emerald-300 underline font-medium cursor-pointer"
+                >
+                  Learn how AgriLend360 operates with FPOs (Platform Concept)
+                </button>
+              </div>
             </form>
           ) : (
             /* Farmer Registration Form */
@@ -238,7 +277,7 @@ const Login = () => {
                   <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Personal Profile</span>
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-450 mb-1 font-semibold">Full Name *</label>
+                  <label className="block text-xs text-slate-400 mb-1 font-semibold">Full Name *</label>
                   <input
                     type="text"
                     name="name"
@@ -250,7 +289,7 @@ const Login = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-450 mb-1 font-semibold">Mobile Number *</label>
+                  <label className="block text-xs text-slate-400 mb-1 font-semibold">Mobile Number *</label>
                   <input
                     type="tel"
                     name="mobile"
@@ -262,7 +301,7 @@ const Login = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-450 mb-1 font-semibold">Email Address *</label>
+                  <label className="block text-xs text-slate-400 mb-1 font-semibold">Email Address *</label>
                   <input
                     type="email"
                     name="email"
@@ -274,7 +313,7 @@ const Login = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-450 mb-1 font-semibold">Password *</label>
+                  <label className="block text-xs text-slate-400 mb-1 font-semibold">Password *</label>
                   <input
                     type="password"
                     name="password"
@@ -286,7 +325,7 @@ const Login = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-450 mb-1 font-semibold">Government / Aadhaar ID *</label>
+                  <label className="block text-xs text-slate-400 mb-1 font-semibold">Government / Aadhaar ID *</label>
                   <input
                     type="text"
                     name="governmentId"
@@ -303,7 +342,7 @@ const Login = () => {
                   <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Agrarian & Financial Details</span>
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-450 mb-1 font-semibold">Land Area (Acres) *</label>
+                  <label className="block text-xs text-slate-400 mb-1 font-semibold">Land Area (Acres) *</label>
                   <input
                     type="number"
                     step="0.01"
@@ -316,7 +355,7 @@ const Login = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-450 mb-1 font-semibold">Ownership Type *</label>
+                  <label className="block text-xs text-slate-400 mb-1 font-semibold">Ownership Type *</label>
                   <select
                     name="ownershipType"
                     value={regData.ownershipType}
@@ -330,7 +369,7 @@ const Login = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-450 mb-1 font-semibold">Primary Crop *</label>
+                  <label className="block text-xs text-slate-400 mb-1 font-semibold">Primary Crop *</label>
                   <select
                     name="primaryCrop"
                     value={regData.primaryCrop}
@@ -347,7 +386,7 @@ const Login = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-450 mb-1 font-semibold">Secondary Crop (Optional)</label>
+                  <label className="block text-xs text-slate-400 mb-1 font-semibold">Secondary Crop (Optional)</label>
                   <input
                     type="text"
                     name="secondaryCrop"
@@ -358,7 +397,7 @@ const Login = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-450 mb-1 font-semibold">Estimated Annual Income (₹) *</label>
+                  <label className="block text-xs text-slate-400 mb-1 font-semibold">Estimated Annual Income (₹) *</label>
                   <input
                     type="number"
                     name="annualIncome"
@@ -375,7 +414,7 @@ const Login = () => {
                   <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Geography Coordinates</span>
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs text-slate-450 mb-1 font-semibold">Full Address *</label>
+                  <label className="block text-xs text-slate-400 mb-1 font-semibold">Full Address *</label>
                   <textarea
                     name="address"
                     required
@@ -387,7 +426,7 @@ const Login = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-450 mb-1 font-semibold">Village *</label>
+                  <label className="block text-xs text-slate-400 mb-1 font-semibold">Village *</label>
                   <input
                     type="text"
                     name="village"
@@ -399,7 +438,7 @@ const Login = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-450 mb-1 font-semibold">District *</label>
+                  <label className="block text-xs text-slate-400 mb-1 font-semibold">District *</label>
                   <input
                     type="text"
                     name="district"
@@ -411,7 +450,7 @@ const Login = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-450 mb-1 font-semibold">State *</label>
+                  <label className="block text-xs text-slate-400 mb-1 font-semibold">State *</label>
                   <input
                     type="text"
                     name="state"
@@ -424,7 +463,7 @@ const Login = () => {
                 </div>
                 <div className="col-span-2 grid grid-cols-2 gap-4 items-end">
                   <div>
-                    <label className="block text-xs text-slate-450 mb-1 font-semibold">Latitude *</label>
+                    <label className="block text-xs text-slate-400 mb-1 font-semibold">Latitude *</label>
                     <input
                       type="number"
                       step="any"
@@ -437,7 +476,7 @@ const Login = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-450 mb-1 font-semibold">Longitude *</label>
+                    <label className="block text-xs text-slate-400 mb-1 font-semibold">Longitude *</label>
                     <input
                       type="number"
                       step="any"
@@ -473,6 +512,9 @@ const Login = () => {
           )}
         </div>
       </div>
+
+      {/* About Modal */}
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
     </div>
   );
 };

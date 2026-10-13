@@ -73,9 +73,16 @@ const seedData = async () => {
       role: 'Admin',
     });
 
-    const officerUser = await User.create({
+    const officerUser1 = await User.create({
       name: 'Ramesh Patel',
       email: 'officer@agrilend360.com',
+      password: 'officer123',
+      role: 'Loan Officer',
+    });
+
+    const officerUser2 = await User.create({
+      name: 'Deepak Rao',
+      email: 'officer2@agrilend360.com',
       password: 'officer123',
       role: 'Loan Officer',
     });
@@ -171,16 +178,21 @@ const seedData = async () => {
 
     console.log(`Seeded ${farmers.length} total farmers.`);
 
-    // 3. Create Loan Applications and Schedules
+    // 3. Create Loan Applications with realistic workflow distribution
     const loanPurposes = ['Seeds', 'Fertilizer', 'Equipment', 'Irrigation', 'Livestock', 'Crop cultivation'];
+    const fundingSources = ['FPO_FUND', 'PARTNER_BANK', 'FINANCIAL_INSTITUTION', 'OTHER'];
     
-    // We will distribute loans across different statuses
-    // 0: defaultFarmer: Active loan
-    // 1-5: CLOSED loans (historical success)
-    // 6-12: ACTIVE loans (some paid, some overdue)
-    // 13-18: PENDING / UNDER REVIEW applications
-    // 19-21: DOCUMENT VERIFIED / APPROVED applications
-    // 22-24: REJECTED applications
+    // Status distribution:
+    // 0: defaultFarmer: Active loan (disbursed, repayments scheduled)
+    // 1-4: CLOSED loans (successfully repaid)
+    // 5-11: ACTIVE loans (some paid, some overdue)
+    // 12-14: PENDING (new submissions)
+    // 15-17: UNDER REVIEW (assigned to officer)
+    // 18-19: DOCUMENT VERIFIED (docs verified, assessment complete)
+    // 20-21: RECOMMENDED (officer submitted recommendation, awaiting admin decision)
+    // 22-23: APPROVED (approved by admin, awaiting disbursement recording)
+    // 24: NEEDS_INFORMATION (officer requested extra details)
+    // 25: REJECTED (declined)
 
     const today = new Date();
 
@@ -189,23 +201,55 @@ const seedData = async () => {
       const loanAmount = Math.round((40000 + Math.random() * 80000) / 5000) * 5000;
       const purpose = loanPurposes[i % loanPurposes.length];
       const duration = i % 2 === 0 ? 12 : 6;
-      
+      const fundingSource = fundingSources[i % fundingSources.length];
+      const assignedOfficer = i % 2 === 0 ? officerUser1 : officerUser2;
+
       let status = 'PENDING';
       let riskScore = 20;
       let riskLevel = 'LOW';
       let eligibilityScore = 80;
+      let officerRecommendation = 'NONE';
+      let officerRecommendationRemarks = '';
+      let recommendedBy = undefined;
+      let recommendedAt = undefined;
+      let finalDecision = 'PENDING';
+      let finalDecisionRemarks = '';
+      let approvedBy = undefined;
+      let approvedAt = undefined;
+      let disbursedBy = undefined;
+      let disbursedAt = undefined;
 
       if (i === 0) {
         status = 'ACTIVE';
         riskScore = 18;
         riskLevel = 'LOW';
         eligibilityScore = 82;
-      } else if (i >= 1 && i <= 5) {
+        officerRecommendation = 'RECOMMEND APPROVAL';
+        officerRecommendationRemarks = 'Verified borrower has exemplary yield record and clean land ownership.';
+        recommendedBy = officerUser1._id;
+        recommendedAt = new Date(today.getTime() - 85 * 24 * 60 * 60 * 1000);
+        finalDecision = 'APPROVED';
+        finalDecisionRemarks = 'Approved by authorized FPO approving authority.';
+        approvedBy = adminUser._id;
+        approvedAt = new Date(today.getTime() - 82 * 24 * 60 * 60 * 1000);
+        disbursedBy = adminUser._id;
+        disbursedAt = new Date(today.getTime() - 80 * 24 * 60 * 60 * 1000);
+      } else if (i >= 1 && i <= 4) {
         status = 'CLOSED';
         riskScore = 15;
         riskLevel = 'LOW';
-        eligibilityScore = 85;
-      } else if (i >= 6 && i <= 12) {
+        eligibilityScore = 88;
+        officerRecommendation = 'RECOMMEND APPROVAL';
+        officerRecommendationRemarks = 'Applicant has completed previous cycles without default.';
+        recommendedBy = assignedOfficer._id;
+        recommendedAt = new Date(today.getTime() - 195 * 24 * 60 * 60 * 1000);
+        finalDecision = 'APPROVED';
+        finalDecisionRemarks = 'Approved allocation.';
+        approvedBy = adminUser._id;
+        approvedAt = new Date(today.getTime() - 190 * 24 * 60 * 60 * 1000);
+        disbursedBy = adminUser._id;
+        disbursedAt = new Date(today.getTime() - 180 * 24 * 60 * 60 * 1000);
+      } else if (i >= 5 && i <= 11) {
         status = 'ACTIVE';
         riskScore = Math.floor(15 + Math.random() * 70);
         if (riskScore > 80) riskLevel = 'CRITICAL';
@@ -213,26 +257,77 @@ const seedData = async () => {
         else if (riskScore > 30) riskLevel = 'MEDIUM';
         else riskLevel = 'LOW';
         eligibilityScore = 100 - riskScore;
-      } else if (i >= 13 && i <= 15) {
+        officerRecommendation = 'RECOMMEND APPROVAL';
+        officerRecommendationRemarks = 'Agricultural yield sufficient to support requested repayment schedule.';
+        recommendedBy = assignedOfficer._id;
+        recommendedAt = new Date(today.getTime() - 85 * 24 * 60 * 60 * 1000);
+        finalDecision = 'APPROVED';
+        finalDecisionRemarks = 'FPO credit committee authorized loan release.';
+        approvedBy = adminUser._id;
+        approvedAt = new Date(today.getTime() - 82 * 24 * 60 * 60 * 1000);
+        disbursedBy = adminUser._id;
+        disbursedAt = new Date(today.getTime() - 80 * 24 * 60 * 60 * 1000);
+      } else if (i >= 12 && i <= 14) {
         status = 'PENDING';
+        riskScore = Math.floor(20 + Math.random() * 25);
+        riskLevel = 'LOW';
+        eligibilityScore = 100 - riskScore;
+      } else if (i >= 15 && i <= 17) {
+        status = 'UNDER REVIEW';
+        riskScore = Math.floor(25 + Math.random() * 30);
+        riskLevel = riskScore > 30 ? 'MEDIUM' : 'LOW';
+        eligibilityScore = 100 - riskScore;
+      } else if (i >= 18 && i <= 19) {
+        status = 'DOCUMENT VERIFIED';
+        riskScore = Math.floor(20 + Math.random() * 30);
+        riskLevel = 'LOW';
+        eligibilityScore = 100 - riskScore;
+      } else if (i >= 20 && i <= 21) {
+        status = 'RECOMMENDED';
         riskScore = Math.floor(20 + Math.random() * 30);
         riskLevel = riskScore > 30 ? 'MEDIUM' : 'LOW';
         eligibilityScore = 100 - riskScore;
-      } else if (i >= 16 && i <= 18) {
-        status = 'UNDER REVIEW';
-        riskScore = Math.floor(35 + Math.random() * 40);
-        riskLevel = riskScore > 60 ? 'HIGH' : 'MEDIUM';
-        eligibilityScore = 100 - riskScore;
-      } else if (i >= 19 && i <= 21) {
+        officerRecommendation = 'RECOMMEND APPROVAL';
+        officerRecommendationRemarks = 'Farmer documents verified. Clean credit standing. Ready for final FPO approval.';
+        recommendedBy = assignedOfficer._id;
+        recommendedAt = new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000);
+      } else if (i >= 22 && i <= 23) {
         status = 'APPROVED';
-        riskScore = Math.floor(10 + Math.random() * 20);
+        riskScore = Math.floor(12 + Math.random() * 20);
         riskLevel = 'LOW';
         eligibilityScore = 90;
+        officerRecommendation = 'RECOMMEND APPROVAL';
+        officerRecommendationRemarks = 'Highly recommended based on diversified vegetable farming assets.';
+        recommendedBy = assignedOfficer._id;
+        recommendedAt = new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000);
+        finalDecision = 'APPROVED';
+        finalDecisionRemarks = 'Approved by authorized FPO approving authority. Ready for disbursement recording.';
+        approvedBy = adminUser._id;
+        approvedAt = new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000);
+      } else if (i === 24) {
+        status = 'NEEDS_INFORMATION';
+        riskScore = 55;
+        riskLevel = 'MEDIUM';
+        eligibilityScore = 45;
+        officerRecommendation = 'NEEDS ADDITIONAL INFORMATION';
+        officerRecommendationRemarks = 'Please submit updated land survey deed and crop harvest certificate.';
+        recommendedBy = assignedOfficer._id;
+        recommendedAt = new Date(today.getTime() - 4 * 24 * 60 * 60 * 1000);
+        finalDecision = 'NEEDS_INFORMATION';
+        finalDecisionRemarks = 'Awaiting updated documentation.';
       } else {
         status = 'REJECTED';
-        riskScore = Math.floor(65 + Math.random() * 30);
+        riskScore = Math.floor(70 + Math.random() * 25);
         riskLevel = riskScore > 80 ? 'CRITICAL' : 'HIGH';
         eligibilityScore = 15;
+        officerRecommendation = 'RECOMMEND REJECTION';
+        officerRecommendationRemarks = 'Unmanageable debt-to-income density relative to small land parcel.';
+        recommendedBy = assignedOfficer._id;
+        recommendedAt = new Date(today.getTime() - 20 * 24 * 60 * 60 * 1000);
+        finalDecision = 'REJECTED';
+        finalDecisionRemarks = 'FPO authority declined application based on elevated default risk profile.';
+        approvedBy = adminUser._id;
+        approvedAt = new Date(today.getTime() - 18 * 24 * 60 * 60 * 1000);
       }
 
       const randomSuffix = Math.floor(1000 + Math.random() * 9000);
@@ -247,41 +342,120 @@ const seedData = async () => {
         riskScore,
         riskLevel,
         eligibilityScore,
-        approvedBy: ['APPROVED', 'ACTIVE', 'CLOSED'].includes(status) ? adminUser._id : undefined,
-        approvedAt: ['APPROVED', 'ACTIVE', 'CLOSED'].includes(status) ? new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000) : undefined,
-        disbursedAt: ['ACTIVE', 'CLOSED'].includes(status) ? new Date(today.getTime() - 80 * 24 * 60 * 60 * 1000) : undefined,
+        fundingSource,
+        assignedOfficer: ['UNDER REVIEW', 'DOCUMENT VERIFIED', 'RECOMMENDED', 'APPROVED', 'ACTIVE', 'CLOSED', 'REJECTED', 'NEEDS_INFORMATION'].includes(status) ? assignedOfficer._id : undefined,
+        assignedAt: ['UNDER REVIEW', 'DOCUMENT VERIFIED', 'RECOMMENDED', 'APPROVED', 'ACTIVE', 'CLOSED', 'REJECTED', 'NEEDS_INFORMATION'].includes(status) ? new Date(today.getTime() - 95 * 24 * 60 * 60 * 1000) : undefined,
+        officerRecommendation,
+        officerRecommendationRemarks,
+        recommendedBy,
+        recommendedAt,
+        finalDecision,
+        finalDecisionRemarks,
+        approvedBy,
+        approvedAt,
+        disbursedBy,
+        disbursedAt,
       });
 
       // Seeding Audit logs
       await AuditLog.create({
         loanId: l._id,
         userId: farmer.userId,
-        action: 'SUBMITTED',
+        action: 'APPLICATION_SUBMITTED',
         previousStatus: '',
         newStatus: 'PENDING',
-        remarks: 'Farmer submitted application through mobile app.',
+        remarks: 'Farmer submitted digital loan application through FPO platform.',
         timestamp: new Date(today.getTime() - 100 * 24 * 60 * 60 * 1000),
       });
+
+      await AuditLog.create({
+        loanId: l._id,
+        userId: farmer.userId,
+        action: 'ASSESSMENT_GENERATED',
+        previousStatus: 'PENDING',
+        newStatus: 'PENDING',
+        remarks: `Decision-support assessment generated. Eligibility: ${eligibilityScore}/100, Default Risk: ${riskScore}% (${riskLevel}).`,
+        timestamp: new Date(today.getTime() - 100 * 24 * 60 * 60 * 1000),
+      });
+
+      if (l.assignedOfficer) {
+        await AuditLog.create({
+          loanId: l._id,
+          userId: adminUser._id,
+          action: 'OFFICER_ASSIGNED',
+          previousStatus: 'PENDING',
+          newStatus: 'UNDER REVIEW',
+          remarks: `Admin assigned application to Loan Officer ${assignedOfficer.name}.`,
+          timestamp: new Date(today.getTime() - 95 * 24 * 60 * 60 * 1000),
+        });
+      }
+
+      // Seed documents for the loan
+      await Document.create({
+        farmerId: farmer._id,
+        loanId: l._id,
+        documentType: 'Identity Proof',
+        fileName: 'Aadhaar_KYC_Proof.pdf',
+        filePath: './uploads/sample_kyc_doc.pdf',
+        verificationStatus: ['DOCUMENT VERIFIED', 'RECOMMENDED', 'APPROVED', 'ACTIVE', 'CLOSED'].includes(status) ? 'VERIFIED' : 'PENDING',
+        uploadedAt: new Date(today.getTime() - 98 * 24 * 60 * 60 * 1000),
+      });
+
+      await Document.create({
+        farmerId: farmer._id,
+        loanId: l._id,
+        documentType: 'Land Document',
+        fileName: 'Land_Title_Registry.pdf',
+        filePath: './uploads/sample_kyc_doc.pdf',
+        verificationStatus: ['DOCUMENT VERIFIED', 'RECOMMENDED', 'APPROVED', 'ACTIVE', 'CLOSED'].includes(status) ? 'VERIFIED' : (status === 'REJECTED' ? 'REJECTED' : 'PENDING'),
+        uploadedAt: new Date(today.getTime() - 98 * 24 * 60 * 60 * 1000),
+      });
+
+      if (['DOCUMENT VERIFIED', 'RECOMMENDED', 'APPROVED', 'ACTIVE', 'CLOSED'].includes(status)) {
+        await AuditLog.create({
+          loanId: l._id,
+          userId: assignedOfficer._id,
+          action: 'DOCUMENT_VERIFIED',
+          previousStatus: 'UNDER REVIEW',
+          newStatus: 'DOCUMENT VERIFIED',
+          remarks: 'Verified Aadhaar KYC card, Land Title Deed, and crop cultivation data.',
+          timestamp: new Date(today.getTime() - 92 * 24 * 60 * 60 * 1000),
+        });
+      }
+
+      if (['RECOMMENDED', 'APPROVED', 'ACTIVE', 'CLOSED', 'REJECTED', 'NEEDS_INFORMATION'].includes(status)) {
+        await AuditLog.create({
+          loanId: l._id,
+          userId: assignedOfficer._id,
+          action: 'OFFICER_RECOMMENDATION',
+          previousStatus: 'DOCUMENT VERIFIED',
+          newStatus: status === 'RECOMMENDED' ? 'RECOMMENDED' : (status === 'NEEDS_INFORMATION' ? 'NEEDS_INFORMATION' : 'DOCUMENT VERIFIED'),
+          remarks: `Loan Officer submitted formal recommendation: "${officerRecommendation}". Remarks: ${officerRecommendationRemarks}`,
+          timestamp: recommendedAt || new Date(today.getTime() - 91 * 24 * 60 * 60 * 1000),
+        });
+      }
 
       if (['APPROVED', 'ACTIVE', 'CLOSED'].includes(status)) {
         await AuditLog.create({
           loanId: l._id,
-          userId: officerUser._id,
-          action: 'STATUS_CHANGE',
-          previousStatus: 'PENDING',
-          newStatus: 'DOCUMENT_VERIFIED',
-          remarks: 'Verified Aadhaar, Land Title Deed, and crop income certificate.',
-          timestamp: new Date(today.getTime() - 95 * 24 * 60 * 60 * 1000),
+          userId: adminUser._id,
+          action: 'ADMIN_DECISION',
+          previousStatus: 'RECOMMENDED',
+          newStatus: 'APPROVED',
+          remarks: `Authorized FPO Approving Authority decision: APPROVED. Funding Source: ${fundingSource}. Remarks: Approved by management.`,
+          timestamp: approvedAt || new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000),
         });
+      }
 
+      if (status === 'REJECTED') {
         await AuditLog.create({
           loanId: l._id,
           userId: adminUser._id,
-          action: 'STATUS_CHANGE',
-          previousStatus: 'DOCUMENT_VERIFIED',
-          newStatus: 'APPROVED',
-          remarks: 'Approved based on solid yield estimation and high credit health score.',
-          timestamp: new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000),
+          action: 'ADMIN_DECISION',
+          previousStatus: 'RECOMMENDED',
+          newStatus: 'REJECTED',
+          remarks: `Authorized FPO Approving Authority decision: REJECTED. Remarks: Declined due to high default risk score.`,
+          timestamp: approvedAt || new Date(today.getTime() - 18 * 24 * 60 * 60 * 1000),
         });
       }
 
@@ -289,34 +463,37 @@ const seedData = async () => {
         await AuditLog.create({
           loanId: l._id,
           userId: adminUser._id,
-          action: 'STATUS_CHANGE',
+          action: 'DISBURSEMENT_RECORDED',
           previousStatus: 'APPROVED',
           newStatus: 'ACTIVE',
-          remarks: 'Loan disbursed to Bank Account ending in 8892.',
-          timestamp: new Date(today.getTime() - 80 * 24 * 60 * 60 * 1000),
+          remarks: `Disbursement recorded under funding source: ${fundingSource}. Repayment schedule generated. Amortization tracking active.`,
+          timestamp: disbursedAt || new Date(today.getTime() - 80 * 24 * 60 * 60 * 1000),
         });
 
         // 4. Seeding Repayments
-        // Disbursed 80 days ago. Each EMI is monthly (30 days interval).
-        // Months elapsed = approx 2.6 months (due dates 50 days ago, 20 days ago, and 10 days in the future).
         const schedule = generateEMIArray(l._id, farmer._id, loanAmount, 8.5, duration, new Date(today.getTime() - 80 * 24 * 60 * 60 * 1000));
         
         if (status === 'CLOSED') {
-          // All EMIs are paid
           for (const emi of schedule) {
             emi.status = 'PAID';
-            emi.paymentDate = new Date(emi.dueDate.getTime() - 1 * 24 * 60 * 60 * 1000); // paid 1 day early
+            emi.paymentDate = new Date(emi.dueDate.getTime() - 1 * 24 * 60 * 60 * 1000);
           }
+          await AuditLog.create({
+            loanId: l._id,
+            userId: adminUser._id,
+            action: 'LOAN_CLOSED',
+            previousStatus: 'ACTIVE',
+            newStatus: 'CLOSED',
+            remarks: 'All scheduled EMIs fully settled. Loan successfully closed.',
+            timestamp: new Date(today.getTime() - 10 * 24 * 60 * 60 * 1000),
+          });
         } else if (status === 'ACTIVE') {
-          // First two EMIs (due in the past) are PAID or OVERDUE
-          // Let's create overdue payments for high-risk loans
           for (let k = 0; k < schedule.length; k++) {
             const emi = schedule[k];
             const isPast = emi.dueDate < today;
             
             if (isPast) {
               if (riskLevel === 'HIGH' || riskLevel === 'CRITICAL') {
-                // High risk has missed payments
                 if (k === 0) {
                   emi.status = 'PAID';
                   emi.paymentDate = emi.dueDate;
@@ -328,7 +505,6 @@ const seedData = async () => {
                 emi.paymentDate = emi.dueDate;
               }
             } else {
-              // Future EMIs
               emi.status = 'UPCOMING';
             }
           }
@@ -337,7 +513,7 @@ const seedData = async () => {
       }
     }
 
-    console.log('Seeded repayments and audit logs successfully.');
+    console.log('Seeded documents, repayments, and audit logs successfully.');
 
     // 5. Update Farmer health scores based on newly generated repayment schedule
     const allFarmers = await Farmer.find({});
@@ -348,7 +524,6 @@ const seedData = async () => {
       const fLoans = allLoans.filter(l => l.farmerId.toString() === f._id.toString());
       const fRepayments = allRepayments.filter(r => r.farmerId.toString() === f._id.toString());
 
-      // Simple score estimation logic matching the module
       let activeCount = fLoans.filter(l => ['ACTIVE', 'DISBURSED'].includes(l.status)).length;
       let completedCount = fLoans.filter(l => l.status === 'CLOSED').length;
       let overdueCount = fRepayments.filter(r => r.status === 'OVERDUE').length;
@@ -358,7 +533,6 @@ const seedData = async () => {
       if (activeCount > 0) score += 5;
       score -= overdueCount * 20;
 
-      // Ensure boundary
       f.financialHealthScore = Math.max(15, Math.min(95, score));
       await f.save();
     }

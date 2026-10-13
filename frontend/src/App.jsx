@@ -1,7 +1,9 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthContext, AuthProvider } from './context/AuthContext';
 import Sidebar from './components/Sidebar';
+import AboutModal from './components/AboutModal';
+import { Info } from 'lucide-react';
 import Login from './pages/Login';
 
 // Import Pages
@@ -26,6 +28,7 @@ const HomeDashboard = () => {
 // Route Guard Wrapper for general authentication
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useContext(AuthContext);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
 
   if (loading) {
     return (
@@ -49,9 +52,28 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
       <main className="flex-1 pl-64 min-h-screen bg-slate-950 relative overflow-x-hidden">
         {/* Subtle decorative glow */}
         <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none" />
+        
+        {/* Global Dashboard Top Bar */}
+        <header className="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-md px-6 py-2.5 flex items-center justify-between sticky top-0 z-10">
+          <div className="flex items-center space-x-2 text-xs text-slate-400">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="font-semibold text-slate-200">AgriLend360</span>
+            <span className="text-slate-600">|</span>
+            <span className="text-slate-400">FPO Digital Credit-Management & Decision-Support System</span>
+          </div>
+          <button
+            onClick={() => setIsAboutOpen(true)}
+            className="flex items-center space-x-1.5 px-3 py-1 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 hover:text-white border border-emerald-700/60 rounded-lg text-xs font-semibold transition"
+          >
+            <Info className="h-3.5 w-3.5 text-emerald-400" />
+            <span>About AgriLend360</span>
+          </button>
+        </header>
+
         <div className="p-6 relative z-10">
           {children}
         </div>
+        <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
       </main>
     </div>
   );

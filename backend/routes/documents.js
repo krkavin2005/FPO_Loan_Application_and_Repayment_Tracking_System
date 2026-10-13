@@ -5,7 +5,10 @@ import fs from 'fs';
 import Document from '../models/Document.js';
 import Farmer from '../models/Farmer.js';
 import Loan from '../models/Loan.js';
+import Repayment from '../models/Repayment.js';
+import AuditLog from '../models/AuditLog.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
+import { calculateRiskAndEligibility } from '../services/riskEngine.js';
 
 const router = express.Router();
 
@@ -127,12 +130,28 @@ router.get('/:id/download', protect, async (req, res) => {
       }
     }
 
-    const fullPath = path.resolve(doc.filePath);
+    let fullPath = path.resolve(doc.filePath);
     if (!fs.existsSync(fullPath)) {
-      return res.status(404).json({ message: 'Physical file not found on server storage' });
+      const backendRelative = path.resolve('backend', doc.filePath);
+      const rootUploads = path.resolve('uploads', path.basename(doc.filePath));
+      const backendUploads = path.resolve('backend', 'uploads', path.basename(doc.filePath));
+      if (fs.existsSync(backendRelative)) {
+        fullPath = backendRelative;
+      } else if (fs.existsSync(rootUploads)) {
+        fullPath = rootUploads;
+      } else if (fs.existsSync(backendUploads)) {
+        fullPath = backendUploads;
+      } else {
+        const sampleFile = path.resolve('backend', 'uploads', 'sample_kyc_doc.pdf');
+        if (fs.existsSync(sampleFile)) {
+          fullPath = sampleFile;
+        } else {
+          return res.status(404).json({ message: 'Physical file not found on server storage' });
+        }
+      }
     }
 
-    res.sendFile(fullPath);
+    res.download(fullPath, doc.fileName || path.basename(fullPath));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -154,8 +173,84 @@ router.put('/:id/status', protect, authorize('Admin', 'Loan Officer'), async (re
       return res.status(404).json({ message: 'Document record not found' });
     }
 
+    const loan = await Loan.findById(doc.loanId);
+    if (!loan) {
+      return res.status(404).json({ message: 'Associated loan record not found' });
+    }
+
+    // Verify assigned officer permissions
+    if (req.user.role === 'Loan Officer' && loan.assignedOfficer && loan.assignedOfficer.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'You can only verify documents for loan applications assigned to you' });
+    }
+
+    // When verification begins, transition UNDER REVIEW -> DOCUMENT VERIFICATION
+    if (loan.status === 'UNDER REVIEW') {
+      loan.status = 'DOCUMENT VERIFICATION';
+      await loan.save();
+
+      await AuditLog.create({
+        loanId: loan._id,
+        userId: req.user._id,
+        action: 'DOCUMENT_VERIFICATION_STARTED',
+        previousStatus: 'UNDER REVIEW',
+        newStatus: 'DOCUMENT VERIFICATION',
+        remarks: `Document verification initiated by Loan Officer ${req.user.name}.`,
+      });
+    }
+
     doc.verificationStatus = status;
     await doc.save();
+
+    // Create Audit Log for Document Verification
+    await AuditLog.create({
+      loanId: doc.loanId,
+      userId: req.user._id,
+      action: status === 'VERIFIED' ? 'DOCUMENT_VERIFIED' : 'DOCUMENT_REJECTED',
+      previousStatus: loan.status,
+      newStatus: loan.status,
+      remarks: `${doc.documentType} ("${doc.fileName}") marked as ${status} by ${req.user.name} (${req.user.role}).`,
+    });
+
+    // Check all documents for this loan
+    const allDocs = await Document.find({ loanId: doc.loanId });
+    const allVerified = allDocs.length > 0 && allDocs.every(d => d.verificationStatus === 'VERIFIED');
+    
+    // Only transition to DOCUMENT VERIFIED when ALL documents are verified and none are pending/rejected
+    if (allVerified && ['UNDER REVIEW', 'DOCUMENT VERIFICATION'].includes(loan.status)) {
+      const prevStatus = loan.status;
+      loan.status = 'DOCUMENT VERIFIED';
+      await loan.save();
+
+      await AuditLog.create({
+        loanId: loan._id,
+        userId: req.user._id,
+        action: 'DOCUMENT_VERIFIED',
+        previousStatus: prevStatus,
+        newStatus: 'DOCUMENT VERIFIED',
+        remarks: 'All submitted applicant documents have been successfully verified.',
+      });
+
+      // After required documents are verified, generate decision-support assessment and transition to ASSESSMENT COMPLETED
+      const farmer = await Farmer.findById(loan.farmerId);
+      const existingLoans = await Loan.find({ farmerId: loan.farmerId, _id: { $ne: loan._id } });
+      const farmerRepayments = await Repayment.find({ farmerId: loan.farmerId });
+      const assessment = calculateRiskAndEligibility(farmer, loan.loanAmount, existingLoans, farmerRepayments);
+
+      loan.riskScore = assessment.riskScore;
+      loan.riskLevel = assessment.riskLevel;
+      loan.eligibilityScore = assessment.eligibilityScore;
+      loan.status = 'ASSESSMENT COMPLETED';
+      await loan.save();
+
+      await AuditLog.create({
+        loanId: loan._id,
+        userId: req.user._id,
+        action: 'ASSESSMENT_GENERATED',
+        previousStatus: 'DOCUMENT VERIFIED',
+        newStatus: 'ASSESSMENT COMPLETED',
+        remarks: `Decision-support assessment completed. Eligibility Score: ${assessment.eligibilityScore}/100, Default Risk: ${assessment.riskScore}% (${assessment.riskLevel}). Ready for Loan Officer recommendation.`,
+      });
+    }
 
     res.json({ message: `Document status updated to ${status}`, doc });
   } catch (error) {

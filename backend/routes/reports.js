@@ -11,7 +11,12 @@ const router = express.Router();
 // @access  Private (Admin, Loan Officer)
 router.get('/loans', protect, authorize('Admin', 'Loan Officer'), async (req, res) => {
   try {
-    const loans = await Loan.find({}).populate('farmerId', 'name village district primaryCrop');
+    const query = req.query.status ? { status: req.query.status } : {};
+    const loans = await Loan.find(query)
+      .populate('farmerId', 'name village district primaryCrop')
+      .populate('assignedOfficer', 'name')
+      .populate('recommendedBy', 'name')
+      .populate('approvedBy', 'name');
     
     const reportData = loans.map(l => ({
       loanId: l.loanId,
@@ -22,6 +27,12 @@ router.get('/loans', protect, authorize('Admin', 'Loan Officer'), async (req, re
       purpose: l.purpose,
       duration: `${l.duration} months`,
       status: l.status,
+      fundingSource: l.fundingSource || 'FPO_FUND',
+      assignedOfficer: l.assignedOfficer ? l.assignedOfficer.name : 'Unassigned',
+      officerRecommendation: l.officerRecommendation || 'NONE',
+      recommendationDate: l.recommendedAt ? new Date(l.recommendedAt).toLocaleDateString() : '-',
+      finalDecision: l.finalDecision || 'PENDING',
+      decisionDate: l.approvedAt ? new Date(l.approvedAt).toLocaleDateString() : '-',
       riskScore: `${l.riskScore}%`,
       riskLevel: l.riskLevel,
       eligibilityScore: `${l.eligibilityScore}/100`,

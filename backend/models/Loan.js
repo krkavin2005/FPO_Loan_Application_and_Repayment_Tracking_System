@@ -38,11 +38,16 @@ const loanSchema = new mongoose.Schema(
       enum: [
         'PENDING',
         'UNDER REVIEW',
+        'DOCUMENT VERIFICATION',
         'DOCUMENT VERIFIED',
+        'ASSESSMENT COMPLETED',
+        'RECOMMENDED',
+        'NEEDS_INFORMATION',
         'APPROVED',
         'REJECTED',
         'DISBURSED',
         'ACTIVE',
+        'REPAYMENT MONITORING',
         'CLOSED',
       ],
       default: 'PENDING',
@@ -60,12 +65,53 @@ const loanSchema = new mongoose.Schema(
       type: Number, // assessment score (0-100)
       default: 0,
     },
+    fundingSource: {
+      type: String,
+      enum: ['FPO_FUND', 'PARTNER_BANK', 'FINANCIAL_INSTITUTION', 'OTHER'],
+      default: 'FPO_FUND',
+    },
+    assignedOfficer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    assignedAt: {
+      type: Date,
+    },
+    officerRecommendation: {
+      type: String,
+      enum: ['RECOMMEND APPROVAL', 'RECOMMEND REJECTION', 'NEEDS ADDITIONAL INFORMATION', 'NONE'],
+      default: 'NONE',
+    },
+    officerRecommendationRemarks: {
+      type: String,
+      default: '',
+    },
+    recommendedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    recommendedAt: {
+      type: Date,
+    },
+    finalDecision: {
+      type: String,
+      enum: ['APPROVED', 'REJECTED', 'NEEDS_INFORMATION', 'PENDING'],
+      default: 'PENDING',
+    },
+    finalDecisionRemarks: {
+      type: String,
+      default: '',
+    },
     approvedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     },
     approvedAt: {
       type: Date,
+    },
+    disbursedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
     },
     disbursedAt: {
       type: Date,
