@@ -64,6 +64,12 @@ const Login = () => {
       return;
     }
 
+    if (!regData.latitude || !regData.longitude) {
+      setErrorMsg('Please auto-detect GPS coordinates or pick a quick preset.');
+      setLoading(false);
+      return;
+    }
+
     const result = await registerFarmer(regData);
     setLoading(false);
     if (result.success) {
@@ -80,7 +86,89 @@ const Login = () => {
     setRegData({ ...regData, [e.target.name]: e.target.value });
   };
 
-  const fetchGeoLocation = () => {
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+
+  const setPresetCoordinates = (lat, lng, name) => {
+    setRegData((prev) => ({
+      ...prev,
+      latitude: lat.toFixed(6),
+      longitude: lng.toFixed(6),
+    }));
+    setSuccessMsg(`Preset applied for ${name} (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
+    setErrorMsg('');
+  };
+
+  const fetchGeoLocation = async () => {
+    setIsDetectingLocation(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    // Fallback 1: Geocode using entered village / district / state
+    const fallbackToAddressGeocoding = async () => {
+      const parts = [regData.village, regData.district, regData.state].filter(Boolean);
+      if (parts.length > 0) {
+        try {
+          const query = encodeURIComponent(parts.join(', ') + ', India');
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1`, {
+            headers: { 'User-Agent': 'AgriLend360-FPO-Platform/1.0' }
+          });
+          const data = await res.json();
+          if (data && data.length > 0 && data[0].lat && data[0].lon) {
+            setRegData((prev) => ({
+              ...prev,
+              latitude: parseFloat(data[0].lat).toFixed(6),
+              longitude: parseFloat(data[0].lon).toFixed(6),
+            }));
+            const place = data[0].display_name.split(',').slice(0, 2).join(', ');
+            setSuccessMsg(`Coordinates matched to address: ${place} (${parseFloat(data[0].lat).toFixed(4)}, ${parseFloat(data[0].lon).toFixed(4)})`);
+            return true;
+          }
+        } catch (e) {
+          console.warn('Address geocoding failed:', e);
+        }
+      }
+      return false;
+    };
+
+    // Fallback 2: IP-based geolocation
+    const fallbackToIPLocation = async () => {
+      try {
+        const res = await fetch('https://ipwho.is/');
+        const data = await res.json();
+        if (data && data.latitude && data.longitude) {
+          setRegData((prev) => ({
+            ...prev,
+            latitude: parseFloat(data.latitude).toFixed(6),
+            longitude: parseFloat(data.longitude).toFixed(6),
+          }));
+          const locName = [data.city, data.region].filter(Boolean).join(', ') || 'Regional';
+          setSuccessMsg(`Location detected via network: ${locName} (${parseFloat(data.latitude).toFixed(4)}, ${parseFloat(data.longitude).toFixed(4)}). You may refine manually.`);
+          return true;
+        }
+      } catch (e) {
+        console.warn('ipwho.is failed, trying freeipapi...', e);
+      }
+
+      try {
+        const res = await fetch('https://freeipapi.com/api/json');
+        const data = await res.json();
+        if (data && data.latitude && data.longitude) {
+          setRegData((prev) => ({
+            ...prev,
+            latitude: parseFloat(data.latitude).toFixed(6),
+            longitude: parseFloat(data.longitude).toFixed(6),
+          }));
+          const locName = [data.cityName, data.regionName].filter(Boolean).join(', ') || 'Regional';
+          setSuccessMsg(`Location detected via network: ${locName} (${parseFloat(data.latitude).toFixed(4)}, ${parseFloat(data.longitude).toFixed(4)}). You may refine manually.`);
+          return true;
+        }
+      } catch (e) {
+        console.warn('freeipapi failed:', e);
+      }
+      return false;
+    };
+
+    // 1. Try browser device geolocation first
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -89,13 +177,41 @@ const Login = () => {
             latitude: position.coords.latitude.toFixed(6),
             longitude: position.coords.longitude.toFixed(6),
           }));
+          setSuccessMsg(`GPS coordinates detected accurately (${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)})!`);
+          setIsDetectingLocation(false);
         },
-        (error) => {
-          setErrorMsg('Failed to fetch location. Please enter manually.');
-        }
+        async (error) => {
+          console.warn('Device GPS unavailable or denied (code ' + error.code + '), attempting fallbacks...');
+          
+          // Try address match
+          const addressSuccess = await fallbackToAddressGeocoding();
+          if (addressSuccess) {
+            setIsDetectingLocation(false);
+            return;
+          }
+
+          // Try network IP location
+          const ipSuccess = await fallbackToIPLocation();
+          if (ipSuccess) {
+            setIsDetectingLocation(false);
+            return;
+          }
+
+          setIsDetectingLocation(false);
+          if (error.code === 1) {
+            setErrorMsg('Browser location permission denied. Please select a quick preset below or enter coordinates manually.');
+          } else {
+            setErrorMsg('GPS device location unavailable. Please select a quick preset below or enter coordinates manually.');
+          }
+        },
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
       );
     } else {
-      setErrorMsg('Geolocation is not supported by your browser.');
+      const ipSuccess = await fallbackToIPLocation();
+      setIsDetectingLocation(false);
+      if (!ipSuccess) {
+        setErrorMsg('Geolocation is not supported by your browser. Please select a preset below or enter manually.');
+      }
     }
   };
 
@@ -488,15 +604,53 @@ const Login = () => {
                       placeholder="e.g. 76.6520"
                     />
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-2 space-y-2">
                     <button
                       type="button"
+                      disabled={isDetectingLocation}
                       onClick={fetchGeoLocation}
-                      className="w-full flex items-center justify-center space-x-2 py-2 bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700 rounded-lg text-xs font-semibold transition"
+                      className="w-full flex items-center justify-center space-x-2 py-2.5 bg-slate-800 hover:bg-slate-750 disabled:opacity-50 text-slate-200 hover:text-white border border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer shadow-sm"
                     >
-                      <Navigation className="h-3.5 w-3.5" />
-                      <span>Auto-detect GPS Coordinates</span>
+                      {isDetectingLocation ? (
+                        <>
+                          <span className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                          <span className="text-emerald-400">Detecting GPS / Network Location...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Navigation className="h-3.5 w-3.5 text-emerald-400" />
+                          <span>Auto-detect GPS Coordinates</span>
+                        </>
+                      )}
                     </button>
+
+                    {/* Quick Location Presets for testing & offline devices */}
+                    <div className="bg-slate-950/80 p-2 rounded-lg border border-slate-850">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                          Quick Presets (FPO Hubs):
+                        </span>
+                        <span className="text-[10px] text-slate-500 italic">One-click auto-fill</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { name: 'Mandya', lat: 12.5228, lng: 76.8976 },
+                          { name: 'Mysuru', lat: 12.2958, lng: 76.6394 },
+                          { name: 'Bengaluru Rural', lat: 13.1394, lng: 77.5684 },
+                          { name: 'Hassan', lat: 13.0033, lng: 76.1004 },
+                          { name: 'Shimoga', lat: 13.9299, lng: 75.5681 },
+                        ].map((preset) => (
+                          <button
+                            key={preset.name}
+                            type="button"
+                            onClick={() => setPresetCoordinates(preset.lat, preset.lng, preset.name)}
+                            className="px-2 py-1 bg-slate-900 hover:bg-emerald-950/60 text-slate-300 hover:text-emerald-300 border border-slate-800 hover:border-emerald-800/80 rounded text-[10px] font-medium transition cursor-pointer"
+                          >
+                            📍 {preset.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
